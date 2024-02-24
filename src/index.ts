@@ -44,8 +44,22 @@ async function fetchMessages(channel: GuildTextBasedChannel | TextBasedChannel, 
     return final_messages;
 }
 
+async function fetchMessagesHistory(channel: GuildTextBasedChannel | TextBasedChannel, n: number) {
+    let final_messages = new Array<Message>();
+
+    for (let i = 0; i < n; i += MESSAGES_PER_FETCH) {
+        await channel.messages.fetch({ limit: Math.min(n - i, MESSAGES_PER_FETCH) }).then(messages => {
+            if (messages.size === 0) return;
+
+            final_messages.push(...Array.from(messages.values()));
+        });
+    }
+
+    return final_messages.reverse();
+}
+
 client.on(Events.MessageCreate, async (message) => {
-    if (message.author.bot || !message.reference) return;
+    if (message.author.bot) return;
 
     try {
         let args = message.content.split(" ");
@@ -68,7 +82,8 @@ client.on(Events.MessageCreate, async (message) => {
                 }
             }
 
-            await fetchMessages(message.channel, message.reference.messageId as string, n).then(async messages => {
+            let fetcher = message.reference ? fetchMessages(message.channel, message.reference.messageId as string, n) : fetchMessagesHistory(message.channel, n);
+            fetcher.then(async messages => {
                 const final_message = messages.map(m => {
                     if (m.author.bot) return;
                     return "<" + m.author.username + ">: \n" + m.content;
